@@ -195,6 +195,43 @@ h2.h{font-size:clamp(1.7rem,3.4vw,2.3rem); letter-spacing:-.015em; max-width:22c
 @media (hover:none){ .game-touch{display:flex;} }
 .game-touch .pill{padding:14px 22px; font-size:1.1rem; user-select:none;}
 
+/* cipher assistant */
+.cipher-fab{
+  position:fixed; right:22px; bottom:calc(22px + env(safe-area-inset-bottom,0px)); width:56px; height:56px;
+  border-radius:50%; background:var(--accent); color:#06110F; display:flex; align-items:center; justify-content:center;
+  font-size:1.35rem; cursor:pointer; box-shadow:0 12px 30px -8px rgba(0,0,0,.45); z-index:150; border:none; transition:transform .2s ease;
+}
+.cipher-fab:hover{transform:scale(1.07);}
+.cipher-fab-dot{position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:#4ADE80; border:2px solid var(--bg); animation:fabpulse 2.2s ease-in-out infinite;}
+@keyframes fabpulse{0%,100%{transform:scale(1);} 50%{transform:scale(1.3);}}
+.cipher-panel{
+  position:fixed; right:22px; bottom:calc(90px + env(safe-area-inset-bottom,0px)); width:350px; max-width:calc(100vw - 32px);
+  height:min(480px,68vh); background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  box-shadow:0 30px 60px -20px rgba(0,0,0,.45); display:flex; flex-direction:column; overflow:hidden; z-index:150;
+  opacity:0; transform:translateY(16px) scale(.98); pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+}
+.cipher-panel.open{opacity:1; transform:none; pointer-events:auto;}
+.cipher-head{display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--accent) 12%, transparent);}
+.cipher-head small{color:var(--muted); display:block;}
+.cipher-close{background:none; border:none; color:var(--muted); font-size:1.05rem; cursor:pointer;}
+.cipher-msgs{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px;}
+.cmsg{max-width:84%; padding:9px 13px; border-radius:12px; font-size:.87rem; line-height:1.45;}
+.cmsg.bot{background:var(--bg); border:1px solid var(--line); align-self:flex-start; border-bottom-left-radius:3px;}
+.cmsg.user{background:var(--accent); color:#06110F; align-self:flex-end; border-bottom-right-radius:3px;}
+.cmsg a{color:var(--accent); text-decoration:underline;}
+.cmsg.user a{color:#06110F;}
+.cmsg.typing{display:flex; gap:4px; align-items:center;}
+.cmsg.typing span{width:5px; height:5px; background:var(--muted); border-radius:50%; animation:cblink 1.2s infinite;}
+.cmsg.typing span:nth-child(2){animation-delay:.2s;} .cmsg.typing span:nth-child(3){animation-delay:.4s;}
+@keyframes cblink{0%,80%,100%{opacity:.25;} 40%{opacity:1;}}
+.cipher-form{display:flex; gap:8px; padding:12px; border-top:1px solid var(--line);}
+.cipher-form input{flex:1; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; color:var(--text); font-family:inherit; font-size:.87rem;}
+.cipher-form input:focus{outline:none; border-color:var(--accent);}
+.cipher-form button{padding:10px 14px; border-radius:10px;}
+@media (max-width:480px){
+  .cipher-panel{right:12px; left:12px; width:auto; bottom:calc(84px + env(safe-area-inset-bottom,0px)); height:min(60vh,480px);}
+}
+
 /* footer */
 footer{border-top:1px solid var(--line); padding:70px 0 40px;}
 .foot-grid{display:grid; grid-template-columns:1.2fr .8fr; gap:40px; align-items:end;}
@@ -243,6 +280,7 @@ footer h2{font-size:clamp(1.8rem,4vw,2.6rem); letter-spacing:-.02em; margin-bott
 <li><a href="#certifications">Certifications</a></li>
 <li><a href="#contact">Contact</a></li>
 </ul>
+<button id="themeToggle" class="pill" type="button" style="padding:8px 11px; margin-right:8px;" aria-label="Toggle dark mode">🌙</button>
 <button id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
 </nav>
 <div id="mobileMenu">
@@ -448,6 +486,21 @@ footer h2{font-size:clamp(1.8rem,4vw,2.6rem); letter-spacing:-.02em; margin-bott
 <div class="copyright"><span>Deepraj Das — Bangalore, India</span><span>Built with intention.</span></div>
 </div>
 </footer>
+
+<button id="cipherFab" class="cipher-fab" type="button" aria-label="Open Cipher, Deepraj's AI assistant">
+<span class="cipher-fab-dot"></span>💬
+</button>
+<div id="cipherPanel" class="cipher-panel">
+<div class="cipher-head">
+<div><b>Cipher</b><small>Deepraj's AI assistant</small></div>
+<button id="cipherClose" class="cipher-close" type="button" aria-label="Close">✕</button>
+</div>
+<div id="cipherMsgs" class="cipher-msgs"></div>
+<form id="cipherForm" class="cipher-form">
+<input id="cipherInput" type="text" placeholder="Ask about experience, skills, projects…" autocomplete="off">
+<button type="submit" class="pill solid" aria-label="Send">➤</button>
+</form>
+</div>
 
 <script>
 // progress bar
@@ -682,6 +735,113 @@ if(langBlock) barsIO.observe(langBlock);
   press(rightBtn, ()=>moveR=true, ()=>moveR=false);
   fireBtn.addEventListener('click',()=>{ if(running) shoot(); });
   fireBtn.addEventListener('touchstart',e=>{ e.preventDefault(); if(running) shoot(); },{passive:false});
+})();
+
+/* ---- theme toggle ---- */
+(function(){
+  const root=document.documentElement, btn=document.getElementById('themeToggle');
+  function getSaved(){ try{ return localStorage.getItem('site_theme'); }catch(e){ return null; } }
+  function setSaved(v){ try{ localStorage.setItem('site_theme', v); }catch(e){} }
+  let theme=getSaved() || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light');
+  function apply(t){
+    root.setAttribute('data-theme', t);
+    btn.textContent = t==='dark' ? '☀️' : '🌙';
+    btn.setAttribute('aria-label', t==='dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  }
+  apply(theme);
+  btn.addEventListener('click', ()=>{ theme = theme==='dark' ? 'light' : 'dark'; apply(theme); setSaved(theme); });
+})();
+
+/* ---- Cipher: Deepraj's AI assistant ---- */
+(function(){
+  const KB=[
+    {kw:['who','name','deepraj','introduce'], a:"I'm Cipher, Deepraj Das's AI assistant. He's a Senior Systems Engineer based in Bangalore, India, currently transitioning toward DevOps and cloud infrastructure."},
+    {kw:['role','job','work','current','company','cognizant','title','doing'], a:"Deepraj is a Senior Systems Engineer (CIS) at Cognizant Technology Solutions since December 2024 — handling Active Directory & access management, incident response, and server health monitoring for global clients across Americas, EMEA and APAC."},
+    {kw:['experience','history','career','background'], a:"His path: Senior Systems Engineer at Cognizant (Dec 2024–present), an internship at ONGC redesigning their intranet quiz system (2023), and a summer traineeship at NIELIT on cloud architecture and AWS (2022). See the Experience section above for the full timeline."},
+    {kw:['skill','skills','tech','stack','tools','technology'], a:"Infra/ops: Active Directory, ServiceNow, SolarWinds, Docker, AWS, APIs. Development: Python, React, Node.js, HTML/CSS, MySQL. He's also strong on leadership, problem solving and communication."},
+    {kw:['project','projects','built','apps','github'], a:"Highlights: the ONGC Quiz Management App, an Automated Scholarship Verification Portal (Smart India Hackathon 2022), a Disease Prediction Website, and a personal 50-projects-in-50-days challenge. Full list in the Projects section, or on GitHub: github.com/deeprajdas02"},
+    {kw:['cert','certificat','course','credential'], a:"Docker Foundations Professional Certificate, Career Essentials in Generative AI (Microsoft/LinkedIn), Getting Started with the Google Gemini API, a Cloud Solution Architect bridge course (NIELIT & CDAC), and Ethical Hacking with Cyber Security from IIT Guwahati."},
+    {kw:['education','degree','college','university','study','studied','btech'], a:"B.Tech in Computer Science and Engineering from Assam University (2024)."},
+    {kw:['language','languages','speak'], a:"Bengali (native), Hindi (C1, advanced), and English (B2, upper-intermediate)."},
+    {kw:['hobby','hobbies','fun','interest','travel','gamer','sing','dance'], a:"Outside work he's an avid traveler, into singing, dancing and theatre, and a hardcore gamer."},
+    {kw:['contact','email','phone','reach','hire','linkedin','number'], a:"Best reached at deeprajdwork18@gmail.com or +91 81340 79980 — LinkedIn and GitHub links are in the Contact section below."},
+    {kw:['devops','goal','future','transition','plan'], a:"He's on a self-directed transition into DevOps and cloud infrastructure — building on his systems/IT-support base with hands-on Docker, AWS and automation practice."},
+    {kw:['location','based','live','city','bangalore','where'], a:"Bangalore, India."},
+    {kw:['hackathon','sih','smart india','finalist'], a:"Finalist at Smart India Hackathon (SIH-2022), Parul University, Vadodara."},
+    {kw:['game','play','shoot','robot'], a:"There's a small pixel-art game in the Play section above — defend the grid from rogue bots!"}
+  ];
+  function tokenize(s){ return s.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(Boolean); }
+  function findAnswer(q){
+    const tokens=tokenize(q);
+    let best=null, bestScore=0;
+    KB.forEach(e=>{
+      let s=0;
+      e.kw.forEach(k=>{ if(tokens.includes(k)) s+=2; else if(tokens.some(t=>t.length>3&&(t.includes(k)||k.includes(t)))) s+=1; });
+      if(s>bestScore){ bestScore=s; best=e; }
+    });
+    return bestScore>=2 ? best.a : null;
+  }
+
+  const fab=document.getElementById('cipherFab'), panel=document.getElementById('cipherPanel'),
+        closeBtn=document.getElementById('cipherClose'), msgs=document.getElementById('cipherMsgs'),
+        form=document.getElementById('cipherForm'), input=document.getElementById('cipherInput');
+
+  function bubble(text, who){
+    const d=document.createElement('div');
+    d.className='cmsg '+who;
+    d.innerHTML=text;
+    msgs.appendChild(d);
+    msgs.scrollTop=msgs.scrollHeight;
+    return d;
+  }
+  function typingBubble(){
+    const d=document.createElement('div');
+    d.className='cmsg bot typing';
+    d.innerHTML='<span></span><span></span><span></span>';
+    msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
+    return d;
+  }
+  function getName(){ try{ return localStorage.getItem('cipher_visitor_name'); }catch(e){ return null; } }
+  function setName(n){ try{ localStorage.setItem('cipher_visitor_name', n); }catch(e){} }
+
+  let opened=false;
+  fab.addEventListener('click',()=>{
+    panel.classList.toggle('open');
+    if(!opened){
+      opened=true;
+      const name=getName();
+      const greet=name
+        ? `Welcome back, ${name}! Ask me anything else about Deepraj — his experience, skills, projects, or how to reach him.`
+        : `Hi, I'm Cipher — ask me anything about Deepraj: his experience, skills, projects, or how to get in touch.`;
+      bubble(greet,'bot');
+      input.focus();
+    }
+  });
+  closeBtn.addEventListener('click',()=>panel.classList.remove('open'));
+
+  form.addEventListener('submit', e=>{
+    e.preventDefault();
+    const q=input.value.trim();
+    if(!q) return;
+    bubble(q.replace(/</g,'&lt;'),'user');
+    input.value='';
+
+    const nameMatch=q.match(/\bmy name is ([a-zA-Z]+)|\bi'?m ([a-zA-Z]+)\b/i);
+    if(nameMatch){ const n=nameMatch[1]||nameMatch[2]; if(n && n.length<20){ setName(n); } }
+
+    const tb=typingBubble();
+    setTimeout(()=>{
+      tb.remove();
+      const ans=findAnswer(q);
+      if(ans){
+        bubble(ans,'bot');
+      }else{
+        const subject=encodeURIComponent('Question via Cipher (portfolio site)');
+        const body=encodeURIComponent('A visitor asked: "'+q+'"\n\n(via Cipher on your portfolio)');
+        bubble(`I don't have that on file yet — you can <a href="mailto:deeprajdwork18@gmail.com?subject=${subject}&body=${body}" target="_blank" rel="noopener">email Deepraj directly</a> and he can teach me for next time.`,'bot');
+      }
+    }, 500+Math.random()*400);
+  });
 })();
 </script>
 </body>
